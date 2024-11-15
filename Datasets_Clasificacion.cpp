@@ -1,8 +1,27 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
-
 using namespace std;
+/*
+Valido = V
+Deadlock = D
+Condicion de carrera = C
+Violacion de atomicidad = A
+*/
+
+int K = 4; 
+
+struct Dataset {
+
+    vector<string> v = vector<string>(K); //almacenar la cadena de operaciones
+    string tipo; //Tipo de hilo que sea (noop,w,uw,wu,r,cr,r,dr)
+
+};
+
+const vector<string> noOp = { ".", "-", "_" };//Cambio en los simbolos ya que "," en el formato csv actua de separador
+vector<vector<string>> vf1(0);
+vector<Dataset> vf2(0);
+vector<Dataset> vf3(0);
 
 /*
 Valido = V
@@ -11,164 +30,158 @@ Condicion de carrera = C
 Violacion de atomicidad = A
 */
 
-int K = 4;
-int K_Funcion1 = 2; // Longitud reducida para Funci髇 1
-int numeroCombinaciones;
-
-// Estructura para representar las operaciones de Funci髇 2 y Funci髇 3
-struct Dataset {
-    vector<string> v = vector<string>(K);
-    bool hasW = false, hasU = false, hasD = false, hasR = false, hasC = false;
-};
-
-const vector<string> noOp = { ".", ",", "_" };  // Caracteres correctos para Funci髇 1
-vector<vector<string>> vf1(0);
-vector<Dataset> vf2(0);
-vector<Dataset> vf3(0);
-
-// Funci髇 para clasificar programas seg鷑 la tabla de errores concurrentes
-string clasificarPrograma(const Dataset& d2, const Dataset& d3) {
-    // Verificar si "u" aparece antes de "w" en Funci髇 2
-    bool uBeforeW = false;
-    for (const string& op : d2.v) {
-        if (op == "u") uBeforeW = true;
-        if (op == "w" && !uBeforeW) {
-            uBeforeW = false;
-            break;
-        }
-    }
-
-    // Clasificar seg鷑 la tabla teniendo en cuenta el orden
-    if (d2.hasU && d2.hasW && d3.hasD && d3.hasR && uBeforeW) return "A"; // "uwdr"
-    if ((d3.hasR && !d2.hasU && !d3.hasD && !d3.hasC) || (d2.hasU && d2.hasW && d3.hasR && !d3.hasD && !d3.hasC)) return "C";
-    if (d3.hasD && !d2.hasU) return "D";
-    return "V"; // Programa v醠ido
-}
-
-// Funci髇 para generar combinaciones de Funci髇 1 (menor longitud)
-void generarCombinacionesF1() {
-    for (const string& op1 : noOp) {
-        for (const string& op2 : noOp) {
-            vf1.push_back({ op1, op2 });
-        }
-    }
-}
-// Funci髇 para generar combinaciones de Funci髇 2
-void combinacionesF2(int k, Dataset dv, bool w, bool u) {
+// Funci贸n para generar combinaciones de Funci贸n 1
+void combinacionesF1(int k, vector<string> v) {
     if (k == K) {
-        if (u && !w) {} // Caso inv醠ido
-        else vf2.push_back(dv);
+        vf1.push_back(v);
     }
     else {
-        int random = rand() % noOp.size();
+        int random = rand() % 3;
+        v[k] = noOp[random];
+        combinacionesF1(k + 1, v);
+    }
+}
+
+string tipo2(bool anteu, bool w, bool u) {
+    if (w) {
+        if (u) {
+            if (anteu) return "uw";
+            return "wu";
+        }
+        return "w";
+    }
+    return "noop";
+}
+
+// Funci贸n para generar combinaciones de Funci贸n 2
+void combinacionesF2(int k, Dataset dv, bool w, bool u, bool anteu) {
+    if (k == K) {
+        if (u && !w) {} // Caso inv谩lido
+        else { 
+            dv.tipo = tipo2(anteu, w, u);
+            vf2.push_back(dv); 
+        }
+    }
+    else {
+        int random = rand() % 3;
         dv.v[k] = noOp[random];
-        combinacionesF2(k + 1, dv, w, u);
+        combinacionesF2(k + 1, dv, w, u, anteu);
 
         if (!w) {
             dv.v[k] = "w";
-            dv.hasW = true;
-            combinacionesF2(k + 1, dv, true, u);
+            combinacionesF2(k + 1, dv, true, u, anteu);
         }
 
         if (!u) {
             dv.v[k] = "u";
-            dv.hasU = true;
-            combinacionesF2(k + 1, dv, w, true);
+            if (!w) anteu = true;
+            combinacionesF2(k + 1, dv, w, true, anteu);
         }
     }
 }
-
-// Funci髇 para generar combinaciones de Funci髇 3
+string tipo3(bool r, bool d, bool c) {
+    
+    if (r) {
+        if (d) return "dr";
+        if (c) return "cr";
+        return "r";
+    }
+    return "noop";
+}
+// Funci贸n para generar combinaciones de Funci贸n 3
 void combinacionesF3(int k, Dataset dv, bool r, bool d, bool c) {
     if (k == K) {
-        if ((c || d) && !r) {} // Caso inv醠ido
-        else { vf3.push_back(dv); }
+        if ((c || d) && !r) {} // Caso inv谩lido
+        else { 
+            dv.tipo=tipo3(r, d, c);
+            vf3.push_back(dv);
+        }
     }
     else {
-        int random = rand() % noOp.size();
+        int random = rand() % 3;
         dv.v[k] = noOp[random];
         combinacionesF3(k + 1, dv, r, d, c);
 
         if (!r) {
             dv.v[k] = "r";
-            dv.hasR = true;
             combinacionesF3(k + 1, dv, true, d, c);
         }
 
         if (!c && !r && !d) {
             dv.v[k] = "c";
-            dv.hasC = true;
             combinacionesF3(k + 1, dv, r, d, true);
         }
 
         if (!d && !r && !c) {
             dv.v[k] = "d";
-            dv.hasD = true;
             combinacionesF3(k + 1, dv, r, true, c);
         }
     }
 }
 
-// Funci髇 para imprimir en la consola el dataset con Funci髇 1 incluida
-void print() {
-    cout << "F1----F2------F3------BUG" << '\n';
-
-    for (const vector<string>& f1 : vf1) {
-        for (const Dataset& d2 : vf2) {
-            for (const Dataset& d3 : vf3) {
-                string clasificacion = clasificarPrograma(d2, d3);
-
-                // Imprimir las operaciones de Funci髇 1
-                for (const string& op : f1) cout << op;
-                cout << "   ";
-
-                // Imprimir las operaciones de Funci髇 2
-                for (const string& op : d2.v) cout << op;
-                cout << "   ";
-
-                // Imprimir las operaciones de Funci髇 3
-                for (const string& op : d3.v) cout << op;
-                cout << "      " << clasificacion << '\n';
-            }
-        }
-    }
+// Funci贸n para clasificar programas seg煤n la tabla de errores concurrentes
+string clasificarPrograma(Dataset d2, Dataset d3) {
+    if (d3.tipo == "noop" || d3.tipo == "cr") return "V";
+    if (d3.tipo == "r") return "C";
+    if (d2.tipo == "uw") return "A"; //no hace falta comprobar que d3 es dr
+    if (d2.tipo == "wu") return "V";
+    return "D";
 }
 
-// Funci髇 para imprimir el dataset en formato CSV con Funci髇 1 incluida
-void printFicheroCSV() {
-    fstream f;
-    f.open("dataset.csv", ios::out);
+void print() {
 
-    if (!f) {
+    // Clasificar y mostrar los resultados
+    cout << "F2------F3------BUG" << '\n';
+
+    for (Dataset d2 : vf2) {
+        for (Dataset d3 : vf3) {
+            string clasificacion = clasificarPrograma(d2, d3);
+
+            for (const string& op : d2.v) cout << op;
+            cout << "   ";
+            for (const string& op : d3.v) cout << op;
+            cout << "      " << clasificacion << '\n';
+        }
+    }
+
+    return;
+}
+
+void printFicheroCSV() {
+    
+    ofstream f("dataset.csv");
+    if (!f.is_open()) {
         cout << "Fichero no creado";
     }
     else {
         // Escribir encabezado del archivo CSV
-        f << "Clasificacion\n";
+        f << "F1,F2,F3,Clasificacion\n";
 
         for (const vector<string>& f1 : vf1) {
             for (const Dataset& d2 : vf2) {
                 for (const Dataset& d3 : vf3) {
                     string clasificacion = clasificarPrograma(d2, d3);
 
-                    // Escribir las operaciones de Funci髇 1
+                    // Escribir las operaciones de Funci贸n 1
                     for (const string& op : f1) {
                         f << op;
                     }
-         
+                    f << ",";
 
-                    // Escribir las operaciones de Funci髇 2
+                    // Escribir las operaciones de Funci贸n 2
                     for (const string& op : d2.v) {
                         f << op;
                     }
+                    f << ",";
 
-                    // Escribir las operaciones de Funci髇 3
+                    // Escribir las operaciones de Funci贸n 3
                     for (const string& op : d3.v) {
                         f << op;
                     }
+                    f << ",";
 
-                    // Escribir la clasificaci髇
-                    f << "    " << clasificacion << "\n";
+                    // Escribir la clasificaci贸n
+                    f << clasificacion << "\n";
                 }
             }
         }
@@ -178,21 +191,40 @@ void printFicheroCSV() {
     }
 }
 
+void representarCombinaciones() {
+    for (int i = 0; i < vf1.size(); i++) {
+        for (int j = 0; j < K; j++)
+            cout << vf1[i][j];
+        cout << '\n';
+    }
+    cout << "--------------------F2" << '\n';
+    for (int i = 0; i < vf2.size(); i++) {
+        for (int j = 0; j < K; j++)
+            cout << vf2[i].v[j];
+        cout << "  " << vf2[i].tipo << '\n';
+    }
+    cout << "--------------------F3" << '\n';
+    for (int i = 0; i < vf3.size(); i++) {
+        for (int j = 0; j < K; j++)
+            cout << vf3[i].v[j];
+        cout << "  " << vf3[i].tipo << '\n';
+    }
+}
 int main() {
-    Dataset dat2, dat3;
 
-    // Generar combinaciones de Funci髇 1 con longitud reducida
-    vector<string> v1(K_Funcion1);
-    generarCombinacionesF1();
-    // Generar combinaciones de Funci髇 2 y Funci髇 3
-    combinacionesF2(0, dat2, false, false);
+    Dataset dat2, dat3;
+    // Generar combinaciones de Funci贸n 1
+    for (int i = 0; i < 3; i++) {
+        vector<string> v(K);
+        combinacionesF1(0, v);
+    }
+    combinacionesF2(0, dat2, false, false, false);
     combinacionesF3(0, dat3, false, false, false);
 
-    // Imprimir en consola
-    print();
+    representarCombinaciones();
+    //print();
+    //printFicheroCSV();
 
-    // Imprimir en formato CSV
-    printFicheroCSV();
 
     return 0;
 }
