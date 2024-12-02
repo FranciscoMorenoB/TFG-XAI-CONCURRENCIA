@@ -24,6 +24,7 @@ class Data():
                 f += self.random_no_op()
                 
         return f
+
         
     def is_buggy(self, sample):
         if 'r' in sample[2] and 'd' not in sample[2] and 'c' not in sample[2]:
@@ -33,8 +34,25 @@ class Data():
                 return sample[1].index('w') >= sample[1].index('u')
             else:
                 return True
-        
         return False
+    
+    def tipe_buggy(self, sample):
+        if (('r' not in sample[2] and 'd' not in sample[2] and 'c' not in sample[2]) or 'c' in sample[2] and 'r' in sample[2]): return "V"
+        if ('d' not in sample[2] and'r' in sample[2]): return "C"
+        if ('u' in sample[1]): #no hace falta comprobar que en sample2 hay dr
+            if sample[1].index('w') >= sample[1].index('u') : return "A"
+            else: return "V"
+        else: return "D"
+        
+    
+    def is_buggy2(self, sample):
+        if (('r' not in sample[2] and 'd' not in sample[2] and 'c' not in sample[2]) or 'c' in sample[2] and 'r' in sample[2]): return True
+        if ('r' in sample[2]): return False
+        if ('u' in sample[1]): #no hace falta comprobar que en sample2 hay dr
+            if sample[1].index('w') >= sample[1].index('u') : return False
+            else: return True
+        return False
+    
     
     def generate_samples(self):
         
@@ -64,7 +82,7 @@ class Data():
                                     f2 = self.generate_f(f2_op, i, interop_dist)
                                     f3 = self.generate_f(f3_op, j, interop_dist)
 
-                                    samples.append([f1, f2, f3, self.is_buggy([f1, f2, f3])])
+                                    samples.append([f1, f2, f3, self.tipe_buggy([f1, f2, f3])])
                                     cnt += 1
                                     
                 if self.first_interval_size == 0:
@@ -93,10 +111,14 @@ class Data():
 
         for col in df:
             unique_chars = unique_chars.union(df[col].unique())
-        unique_chars.remove(True)
-        unique_chars.remove(False)
+       # unique_chars.remove(True)
+       # unique_chars.remove(False)
+        unique_chars.remove('A')
+        unique_chars.remove('C')
+        unique_chars.remove('D')
+        unique_chars.remove('V')
         unique_chars = sorted(list(unique_chars))
-        
+
         self.le = LabelEncoder()
         self.le.fit(unique_chars)
 
@@ -106,7 +128,7 @@ class Data():
             for j in range(self.layer_size):
                 for c in self.le.classes_:
                     feature_names_one_hotted.append(f'f{i + 1}-{j}-{c}')
-                    
+
         df_no_label = df.drop(['Correct'], axis=1)
         df_encoded = df_no_label.apply(self.le.transform)
 
@@ -118,7 +140,7 @@ class Data():
 
         for i in range(1, 3 * self.layer_size):
             df_unique_labels[i] = df_unique_labels[0]
-            
+
         self.unique_labels = df_unique_labels
 
         self.ohe = OneHotEncoder(categories='auto')
@@ -127,7 +149,7 @@ class Data():
         one_hotted_df = pd.DataFrame(self.ohe.transform(df_encoded).toarray(), columns=feature_names_one_hotted)
         self.num_one_hot_encodings = int(one_hotted_df.shape[1] / self.layer_size / 3)
         one_hotted_df['label'] = df['Correct']
-        
+
         columns_one_hotted = list(one_hotted_df.columns.values[:-1])
 
         self.f1_start = 0
@@ -140,10 +162,10 @@ class Data():
         while (columns_one_hotted[self.f3_start].find('f3') == -1):
             self.f3_start += 1
 
-        self.f3_end = len(columns_one_hotted)    
+        self.f3_end = len(columns_one_hotted)
 
         return np.array(one_hotted_df)
-    
+
     def get_one_hot_encoding(self, samples_char_sep, unique_labels=None):
         df = pd.DataFrame(samples_char_sep)
         
@@ -171,7 +193,7 @@ class Data():
         reverse_le = np.apply_along_axis(self.le.inverse_transform, 0, reverse_ohe)
         reverse_separate = np.apply_along_axis(''.join, 1, reverse_le)
         undivide = lambda x: [x[:self.layer_size], x[self.layer_size:self.layer_size*2],  x[self.layer_size*2:], \
-                              self.is_buggy([x[:self.layer_size], x[self.layer_size:self.layer_size*2],  x[self.layer_size*2:]])]
+                              self.tipe_buggy([x[:self.layer_size], x[self.layer_size:self.layer_size*2],  x[self.layer_size*2:]])]
         reverse_divide = list(map(undivide, list(reverse_separate)))
         return reverse_divide
     
@@ -353,7 +375,7 @@ class Data():
     def npfloat_to_tensor(self, ndarray):
         return torch.from_numpy(ndarray.astype(np.float32)).float()
     
-    def __init__(self, layer_size=16, interop_distances=[0], permutation_intervals=1, seed=777):
+    def __init__(self, layer_size=4, interop_distances=[0], permutation_intervals=1, seed=777):
         
         self.Random = random.Random(seed)
         np.random.seed(seed)
@@ -373,4 +395,9 @@ class Data():
         self.samples_char_sep = self.separate_string_chars(self.samples)
         
         self.np_data = self.one_hot_encode(self.samples_char_sep)
+
+prueba=Data()
+#arr=prueba.one_hot_encode(prueba.separate_string_chars(prueba.generate_samples()))
+print(prueba.np_data)
+
       
