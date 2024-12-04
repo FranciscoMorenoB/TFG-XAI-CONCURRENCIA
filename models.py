@@ -12,55 +12,6 @@ from keras.models import *
 from keras.layers import *
 from keras.callbacks import *
 
-def get_cnn_keras(data, filters_l1=32, filters_l2=64, pool_size=4, kernel_initializer='default', optimizer='adam'):
-    input_f1 = Input(shape=(data.f2_start - data.f1_start,1))
-    input_f2 = Input(shape=(data.f3_start - data.f2_start,1))
-    input_f3 = Input(shape=(data.f3_end - data.f3_start,1))
-
-    f1_l1 = Conv1D(filters=filters_l1, kernel_size=(data.num_one_hot_encodings * 4,),
-                   strides=(data.num_one_hot_encodings,), padding='same', activation='relu')(input_f1)
-    f2_l1 = Conv1D(filters=filters_l1, kernel_size=(data.num_one_hot_encodings * 4,),
-                   strides=(data.num_one_hot_encodings,), padding='same', activation='relu')(input_f2)
-    f3_l1 = Conv1D(filters=filters_l1, kernel_size=(data.num_one_hot_encodings * 4,),
-                   strides=(data.num_one_hot_encodings,), padding='same', activation='relu')(input_f3)
-
-    f1_l2 = Conv1D(filters=filters_l1, kernel_size=(2,), padding='same', activation='relu')(f1_l1)
-    f2_l2 = Conv1D(filters=filters_l1, kernel_size=(2,), padding='same', activation='relu')(f2_l1)
-    f3_l2 = Conv1D(filters=filters_l1, kernel_size=(2,), padding='same', activation='relu')(f3_l1)
-    
-    f1_m1 = MaxPooling1D(pool_size=pool_size)(f1_l2)
-    f2_m1 = MaxPooling1D(pool_size=pool_size)(f2_l2)
-    f3_m1 = MaxPooling1D(pool_size=pool_size)(f3_l2)
-    
-    f1_l3 = Conv1D(filters=filters_l2, kernel_size=(2,), padding='same', activation='relu')(f1_m1)
-    f2_l3 = Conv1D(filters=filters_l2, kernel_size=(2,), padding='same', activation='relu')(f2_m1)
-    f3_l3 = Conv1D(filters=filters_l2, kernel_size=(2,), padding='same', activation='relu')(f3_m1)
-
-    f1_l4 = Conv1D(filters=filters_l2, kernel_size=(2,), padding='same', activation='relu')(f1_l3)
-    f2_l4 = Conv1D(filters=filters_l2, kernel_size=(2,), padding='same', activation='relu')(f2_l3)
-    f3_l4 = Conv1D(filters=filters_l2, kernel_size=(2,), padding='same', activation='relu')(f3_l3)
-    
-    f1_m2 = MaxPooling1D(pool_size=2)(f1_l4)
-    f2_m2 = MaxPooling1D(pool_size=2)(f2_l4)
-    f3_m2 = MaxPooling1D(pool_size=2)(f3_l4)
-
-    f1_flatten = Flatten()(f1_m2)
-    f2_flatten = Flatten()(f2_m2)
-    f3_flatten = Flatten()(f3_m2)
-    
-    f1_dense = Dense(8, activation='relu')(f1_flatten)
-    f2_dense = Dense(8, activation='relu')(f2_flatten)
-    f3_dense = Dense(8, activation='relu')(f3_flatten)
-    
-    concat = concatenate([f1_dense, f2_dense, f3_dense])
-    dense = Dense(8, activation='relu')(concat)
-
-    out = Dense(1, activation='softmax')(dense)#puta vaina
-
-    model = Model(inputs=[input_f1, input_f2, input_f3], outputs=out)
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-    
-    return model
 
 class CNN_Model(nn.Module):
    
@@ -513,16 +464,38 @@ class FEEDFORWARD_Model(nn.Module):
     
     
     
-def train_epoch(model, train_X, train_Y, criterion, optimizer, epoch, batch_size, verbose=False):
-    model.train()
-    total_loss = 0
-    correct = 0
-    num_samples = train_X[0].shape[0]
+def train_epoch(model, train_X, train_Y, criterion, optimizer, epoch, batch_size, verbose=False): #batch_size: El tamaño de los lotes en los que se divide el conjunto de datos para el entrenamiento.
+
+    model.train() #indica que el modelo está en modo entren, ya que algunas capas como Dropout o BatchNorm se comportan de manera diferente durante el entrenamiento y la evaluación. Dropout desactiva ciertas neuronas al azar durante el entrenamiento
+    total_loss = 0 #perdida total
+    correct = 0# num de predicciones correctas
+    num_samples = train_X[0].shape[0] # numero de f1 = num de muestras 
+
+
+    #Se recorre el conjunto de entrenamiento en bloques de tamaño batch_size. 
+    # El número de lotes es calculado dividiendo el número total de muestras entre el tamaño del lote, con un ajuste para cubrir el caso en que el número de muestras no sea un múltiplo exacto de batch_size.
     
     for i in range(int((num_samples - 1) / batch_size) + 1):
         # Reset gradient data to 0
-        optimizer.zero_grad()
         
+        #los gradientes sirven para ajustar los parámetros del modelo (como los pesos y los sesgos) de manera que la función de pérdida se minimice y el modelo aprenda a realizar predicciones más precisas.
+        #Los gradientes nos indican cuánto debe cambiar cada peso para reducir el error (función de pérdida).
+        #La magnitud del gradiente indica qué tan grande debe ser el cambio.
+        #La dirección del gradiente indica hacia qué dirección deben moverse los pesos.
+
+        #El gradiente de la función de pérdida LL con respecto a un parámetro ww se denota como: (derivadas)  #∂L / ∂w . Si el gradiente es grande, significa que el modelo está muy sensible a ese peso y que un pequeño cambio puede tener un gran efecto en el resultado
+
+        #Retropropagación es el algoritmo que calcula estos gradientes en redes neuronales.
+
+
+        optimizer.zero_grad() #los gradientes (param) deben ser restablecidos a cero porque PyTorch acumula gradientes por defecto.
+
+        #optimizer.zero_grad(): Pone los gradientes de todos los parámetros del modelo a cero. Es necesario porque, de lo contrario, los gradientes de diferentes pasos se acumularían.
+        #loss.backward(): (antes se calcula la funcion de perdida) Calcula los gradientes de la función de pérdida con respecto a los parámetros del modelo (pesos y sesgo).
+        #optimizer.step(): Actualiza los pesos del modelo utilizando los gradientes calculados por loss.backward(). Los parámetros del modelo se actualizan utilizando el algoritmo de optimización ADAM
+        
+
+        #seleccionar el índice del lote actuala segura que no se intente acceder a índices fuera de rango.
         if (i+1) * batch_size > num_samples:
             batch_slice = slice(i * batch_size, num_samples)
         else:
@@ -530,19 +503,20 @@ def train_epoch(model, train_X, train_Y, criterion, optimizer, epoch, batch_size
             
   
         # 1) Get the prediction for batch
-        output = model(train_X[0][batch_slice], train_X[1][batch_slice], train_X[2][batch_slice]).view(-1)
+        output = model(train_X[0][batch_slice], train_X[1][batch_slice], train_X[2][batch_slice]).view(-1) #view(-1) significa que el tensor resultante será aplanado en una sola dimensión (un vector unidimensional)
 
         target = train_Y[i * batch_size:(i+1)*batch_size]
 
-        # 2) Compute loss
+        # 2) calcula la perdidia
         loss = criterion(output, target)
 
-        # 3) Do backprop
+        # 3) retropropagación, calculo de los gradientes
         loss.backward()
 
-        # 4) Update model
+        # 4) Update los parametros
         optimizer.step()
 
+        #calcular la precicisón del lote
         preds_binary = torch.sigmoid(output) >= 0.5
         target_binary = target >= 0.5
 
