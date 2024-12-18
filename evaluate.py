@@ -84,9 +84,9 @@ def get_stats_and_ratio(samples_original):
 def get_accuracy_by_cases(model, X, Y, original_test_samples):
     model.eval()
 
-    output = model(X[0], X[1], X[2]).view(-1)
-    y_pred = torch.sigmoid(output) >= 0.5
-    Y = Y >= 0.5
+    output = model(X[0], X[1], X[2])
+    y_pred = torch.argmax(torch.softmax(output, dim=1), dim=1)
+
         
     samples_correct = []
 
@@ -105,6 +105,75 @@ def get_accuracy_by_cases(model, X, Y, original_test_samples):
     accuracies['Overall'] = len(samples_correct) / len(original_test_samples)
             
     return accuracies
+
+def get_precision_by_cases(model, X, Y, original_test_samples):
+    model.eval()
+
+    output = model(X[0], X[1], X[2])
+    y_pred = torch.argmax(torch.softmax(output, dim=1), dim=1)
+     
+    #Comprobamos que y_pred e Y tengan el mismo tamaño
+    y_pred = y_pred.cpu().numpy()
+    Y = Y.cpu().numpy()
+
+    # True Positives por clase
+    true_positives = [
+        original_test_samples[i] for i in range(min(len(y_pred), len(Y))) 
+        if y_pred[i] == Y[i] and y_pred[i] > 0
+    ]
+
+    # Predicciones positivas por clase
+    predicted_positives = [
+        original_test_samples[i] for i in range(min(len(y_pred), len(Y))) 
+        if y_pred[i] > 0
+    ]
+
+    # Contar los casos
+    preds_tp = get_count_cases(true_positives)
+    preds_pos = get_count_cases(predicted_positives)
+
+    # Calcular la precisión
+    precisions = {}
+    for k in preds_tp.keys():
+        precisions[k] = preds_tp[k] / preds_pos[k] if preds_pos[k] > 0 else 0.0
+
+    precisions['Overall'] = sum(preds_tp.values()) / sum(preds_pos.values()) if sum(preds_pos.values()) > 0 else 0.0
+
+    return precisions
+
+def get_recall_by_cases(model, X, Y, original_test_samples):
+    model.eval()
+
+    output = model(X[0], X[1], X[2]).view(-1)
+    y_pred = torch.sigmoid(output) >= 0.5
+    Y = Y >= 0.5
+    
+    preds = get_count_cases([original_test_samples[i] for i in range(len(y_pred)) if y_pred[i] == Y[i]])
+    total_relevant = get_count_cases(original_test_samples)
+    
+    recalls = {}
+    for k, v in preds.items():
+        recalls[k] = preds[k] / total_relevant[k] if total_relevant[k] > 0 else 0.0
+        
+    recalls['Overall'] = sum(preds.values()) / sum(total_relevant.values())
+    
+    return recalls
+
+def get_f1_by_cases(model, X, Y, original_test_samples):
+    precision = get_precision_by_cases(model, X, Y, original_test_samples)
+    recall = get_recall_by_cases(model, X, Y, original_test_samples)
+    
+    f1_scores = {}
+    for k in precision.keys():
+        if precision[k] + recall[k] > 0:
+            f1_scores[k] = 2 * (precision[k] * recall[k]) / (precision[k] + recall[k])
+        else:
+            f1_scores[k] = 0.0
+    
+    f1_scores['Overall'] = 2 * (precision['Overall'] * recall['Overall']) / (precision['Overall'] + recall['Overall']) if (precision['Overall'] + recall['Overall']) > 0 else 0.0
+    
+    return f1_scores
+
 
 def convert_to_percentage(x):
     return str(round(x * 100, 1)) + '%'
@@ -170,10 +239,13 @@ def get_fp_fn_indexes(model, x_test, y_test, original_test_samples):
     fn_index = []
     right_preds = []
     
-    output = model(x_test[0], x_test[1], x_test[2]).view(-1)
-    y_pred = output >= 0.5
+    output = model(x_test[0], x_test[1], x_test[2]) #Al parecer .view(-1) hace que la salida se aplane en una sola dimension o algo asi 
+    y_pred = torch.argmax(output, dim=1)  # Clasificacion Multiclase
+    
+    y_test = y_test.long()  #Nos aseguramos que y_test es del tipo correcto, ya que tiene que ser long para la funcion de perdida que tenemos creo
 
-    for i in range(len(y_pred)):
+     # Iterar de forma segura usando el mínimo tamaño
+    for i in range(min(len(y_pred), len(y_test))):
         if y_pred[i] and not y_test[i]:
             wrong_preds.append(original_test_samples[i])
             fp_index.append(i)
