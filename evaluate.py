@@ -144,33 +144,61 @@ def get_precision_by_cases(model, X, Y, original_test_samples):
 def get_recall_by_cases(model, X, Y, original_test_samples):
     model.eval()
 
-    output = model(X[0], X[1], X[2]).view(-1)
-    y_pred = torch.sigmoid(output) >= 0.5
-    Y = Y >= 0.5
-    
-    preds = get_count_cases([original_test_samples[i] for i in range(len(y_pred)) if y_pred[i] == Y[i]])
-    total_relevant = get_count_cases(original_test_samples)
-    
+    # Obtener las predicciones del modelo
+    output = model(X[0], X[1], X[2])
+    y_pred = torch.argmax(torch.softmax(output, dim=1), dim=1)
+
+    # Asegurarnos de que las dimensiones coincidan
+    y_pred = y_pred.cpu().numpy()
+    Y = Y.cpu().numpy()
+
+    # Inicializar contadores
+    true_positives = {cls: 0 for cls in np.unique(Y)}  # TP por clase
+    total_relevant = {cls: 0 for cls in np.unique(Y)}  # TP + FN por clase
+
+    # Calcular TP y casos relevantes para cada clase
+    for i in range(len(Y)):
+        total_relevant[Y[i]] += 1  # Aumentamos el total relevante para la clase verdadera
+        if y_pred[i] == Y[i]:      # Si la predicción coincide con la clase verdadera
+            true_positives[Y[i]] += 1
+
+    # Calcular el recall para cada clase
     recalls = {}
-    for k, v in preds.items():
-        recalls[k] = preds[k] / total_relevant[k] if total_relevant[k] > 0 else 0.0
-        
-    recalls['Overall'] = sum(preds.values()) / sum(total_relevant.values())
-    
+    for cls in true_positives.keys():
+        recalls[cls] = (
+            true_positives[cls] / total_relevant[cls] if total_relevant[cls] > 0 else 0.0
+        )
+
+    # Recall general (macro-promedio)
+    recalls['Overall'] = sum(true_positives.values()) / sum(total_relevant.values())
+
     return recalls
 
 def get_f1_by_cases(model, X, Y, original_test_samples):
     precision = get_precision_by_cases(model, X, Y, original_test_samples)
     recall = get_recall_by_cases(model, X, Y, original_test_samples)
     
+    # Inicializar F1-scores
     f1_scores = {}
-    for k in precision.keys():
-        if precision[k] + recall[k] > 0:
-            f1_scores[k] = 2 * (precision[k] * recall[k]) / (precision[k] + recall[k])
-        else:
-            f1_scores[k] = 0.0
     
-    f1_scores['Overall'] = 2 * (precision['Overall'] * recall['Overall']) / (precision['Overall'] + recall['Overall']) if (precision['Overall'] + recall['Overall']) > 0 else 0.0
+    # Asegurarse de incluir todas las clases posibles
+    all_classes = set(precision.keys()).union(set(recall.keys()))
+    
+    for cls in all_classes:
+        # Obtener precisión y recall para la clase (usar 0.0 si no está presente)
+        prec = precision.get(cls, 0.0)
+        rec = recall.get(cls, 0.0)
+        
+        if prec + rec > 0:
+            f1_scores[cls] = 2 * (prec * rec) / (prec + rec)
+        else:
+            f1_scores[cls] = 0.0
+    
+    # Calcular el F1-score general (Overall)
+    f1_scores['Overall'] = (
+        2 * (precision['Overall'] * recall['Overall']) / (precision['Overall'] + recall['Overall'])
+        if (precision['Overall'] + recall['Overall']) > 0 else 0.0
+    )
     
     return f1_scores
 
