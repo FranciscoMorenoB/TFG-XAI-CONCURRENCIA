@@ -106,94 +106,108 @@ def get_accuracy_by_cases(model, X, Y, original_test_samples):
             
     return accuracies
 
-def get_precision_by_cases(model, X, Y, original_test_samples):
+def get_precision_by_cases(model, X, Y, original_test_samples): #Precisión = VP / (VP + FP), la precisión mide cuántas de las predicciones positivas realmente lo son
     model.eval()
 
     output = model(X[0], X[1], X[2])
     y_pred = torch.argmax(torch.softmax(output, dim=1), dim=1)
-     
-    #Comprobamos que y_pred e Y tengan el mismo tamaño
-    y_pred = y_pred.cpu().numpy()
-    Y = Y.cpu().numpy()
+    #Podrian ser contadores, pero se queda asi para poder debbugear
+    v0=[]
+    f0=[]
+    v1=[]
+    f1=[]
+    v2=[]
+    f2=[]
+    v3=[]
+    f3=[]
+    
+    for i in range(len(y_pred)):
+        if y_pred[i] == 0:
+            if Y[i] == 0:v0.append(original_test_samples[i])
+            else:f0.append(original_test_samples[i]) #falsos positivos      
+        elif y_pred[i] == 1:
+            if Y[i] == 1:v1.append(original_test_samples[i])
+            else:f1.append(original_test_samples[i]) #falsos positivos
+        elif y_pred[i] == 2:
+            if Y[i] == 2:v2.append(original_test_samples[i])
+            else:f2.append(original_test_samples[i]) #falsos positivos
+        elif y_pred[i] == 3:
+            if Y[i] == 3:v3.append(original_test_samples[i])
+            else:f3.append(original_test_samples[i]) #falsos positivos
 
-    # True Positives por clase
-    true_positives = [
-        original_test_samples[i] for i in range(min(len(y_pred), len(Y))) 
-        if y_pred[i] == Y[i] and y_pred[i] > 0
-    ]
+    if len(v0)+len(f0) > 0: precision0 = len(v0)/(len(v0)+len(f0))
+    else: precision0 = 0.0
+    
+    if len(v1)+len(f1) > 0: precision1 = len(v1)/(len(v1)+len(f1))
+    else: precision1 = 0.0
 
-    # Predicciones positivas por clase
-    predicted_positives = [
-        original_test_samples[i] for i in range(min(len(y_pred), len(Y))) 
-        if y_pred[i] > 0
-    ]
+    if len(v2)+len(f2)>0: precision2 = len(v2)/(len(v2)+len(f2))
+    else: precision2 = 0.0
 
-    # Contar los casos
-    preds_tp = get_count_cases(true_positives)
-    preds_pos = get_count_cases(predicted_positives)
+    if len(v3)+len(f3)>0: precision3 = len(v3)/(len(v3)+len(f3))
+    else: precision3 = 0.0
 
-    # Calcular la precisión
-    precisions = {}
-    for k in preds_tp.keys():
-        precisions[k] = preds_tp[k] / preds_pos[k] if preds_pos[k] > 0 else 0.0
+    # Calcular precisión por cada combinación f3_f2
+    precision = {}
 
-    precisions['Overall'] = sum(preds_tp.values()) / sum(preds_pos.values()) if sum(preds_pos.values()) > 0 else 0.0
+    # Calcular precisión general
+    precision['Overall'] = (precision0+precision1+precision2+precision3) / 4 #media aritmetica o media ponderada?
 
-    return precisions
+    return precision
 
-def get_recall_by_cases(model, X, Y, original_test_samples):
+def get_recall_by_cases(model, X, Y, original_test_samples): #VP/VP+FN
     model.eval()
 
     # Obtener las predicciones del modelo
     output = model(X[0], X[1], X[2])
     y_pred = torch.argmax(torch.softmax(output, dim=1), dim=1)
 
-    # Asegurarnos de que las dimensiones coincidan
-    y_pred = y_pred.cpu().numpy()
-    Y = Y.cpu().numpy()
+    #Podrian ser contadores, pero se queda asi para poder debbugear
+    v0=[]
+    f0=[]
+    v1=[]
+    f1=[]
+    v2=[]
+    f2=[]
+    v3=[]
+    f3=[]
+    
+    for i in range(len(y_pred)):
+        
+        if Y[i] == 0:
+            if y_pred[i] == 0:v0.append(original_test_samples[i]) 
+            else:f0.append(original_test_samples[i])   
+        elif y_pred[i] == 1:
+            if Y[i] == 1:v1.append(original_test_samples[i])
+            else:f1.append(original_test_samples[i]) #falsos positivos
+        elif Y[i] == 2:
+            if y_pred[i] == 2:v2.append(original_test_samples[i])
+            else:f2.append(original_test_samples[i]) #falsos positivos
+        elif Y[i] == 3:
+            if y_pred[i] == 3:v3.append(original_test_samples[i])
+            else:f3.append(original_test_samples[i]) #falsos positivos
+        
 
-    # Inicializar contadores
-    true_positives = {cls: 0 for cls in np.unique(Y)}  # TP por clase
-    total_relevant = {cls: 0 for cls in np.unique(Y)}  # TP + FN por clase
+    if len(v0)+len(f0) > 0: recall0 = len(v0)/(len(v0)+len(f0))
+    else: recall0 = 0.0
+    
+    if len(v1)+len(f1) > 0: recall1 = len(v1)/(len(v1)+len(f1))
+    else: recall1 = 0.0
 
-    # Calcular TP y casos relevantes para cada clase
-    for i in range(len(Y)):
-        total_relevant[Y[i]] += 1  # Aumentamos el total relevante para la clase verdadera
-        if y_pred[i] == Y[i]:      # Si la predicción coincide con la clase verdadera
-            true_positives[Y[i]] += 1
+    if len(v2)+len(f2)>0: recall2 = len(v2)/(len(v2)+len(f2))
+    else: recall2 = 0.0
 
-    # Calcular el recall para cada clase
-    recalls = {}
-    for cls in true_positives.keys():
-        recalls[cls] = (
-            true_positives[cls] / total_relevant[cls] if total_relevant[cls] > 0 else 0.0
-        )
+    if len(v3)+len(f3)>0: recall3 = len(v3)/(len(v3)+len(f3))
+    else: recall3 = 0.0
 
-    # Recall general (macro-promedio)
-    recalls['Overall'] = sum(true_positives.values()) / sum(total_relevant.values())
+    recalls={}
+    recalls['Overall'] = (recall0+recall1+recall2+recall3) / 4 #media aritmetica o media ponderada?
 
     return recalls
 
-def get_f1_by_cases(model, X, Y, original_test_samples):
-    precision = get_precision_by_cases(model, X, Y, original_test_samples)
-    recall = get_recall_by_cases(model, X, Y, original_test_samples)
-    
-    # Inicializar F1-scores
-    f1_scores = {}
-    
-    # Asegurarse de incluir todas las clases posibles
-    all_classes = set(precision.keys()).union(set(recall.keys()))
-    
-    for cls in all_classes:
-        # Obtener precisión y recall para la clase (usar 0.0 si no está presente)
-        prec = precision.get(cls, 0.0)
-        rec = recall.get(cls, 0.0)
-        
-        if prec + rec > 0:
-            f1_scores[cls] = 2 * (prec * rec) / (prec + rec)
-        else:
-            f1_scores[cls] = 0.0
-    
+def get_f1_by_cases(precision, recall):
+
+    f1_scores={}
     # Calcular el F1-score general (Overall)
     f1_scores['Overall'] = (
         2 * (precision['Overall'] * recall['Overall']) / (precision['Overall'] + recall['Overall'])
