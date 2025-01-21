@@ -216,7 +216,9 @@ def get_f1_by_cases(precision, recall):
     
     return f1_scores
 
-
+def decodificar(a):
+    ret=["A", "D", "R", "V"]
+    return ret[a]
 def convert_to_percentage(x):
     return str(round(x * 100, 1)) + '%'
 
@@ -273,31 +275,7 @@ def get_stats_df(models_accuracies, model_names, original_test_samples, collapse
     results_pd.rename(index=row_names)
     return results_pd.rename(index=row_names)
 
-def get_fp_fn_indexes(model, x_test, y_test, original_test_samples):
-    model.eval()
-    
-    wrong_preds = []
-    fp_index = []
-    fn_index = []
-    right_preds = []
-    
-    output = model(x_test[0], x_test[1], x_test[2]) #Al parecer .view(-1) hace que la salida se aplane en una sola dimension o algo asi 
-    y_pred = torch.argmax(output, dim=1)  # Clasificacion Multiclase
-    
-    y_test = y_test.long()  #Nos aseguramos que y_test es del tipo correcto, ya que tiene que ser long para la funcion de perdida que tenemos creo
 
-     # Iterar de forma segura usando el mínimo tamaño
-    for i in range(min(len(y_pred), len(y_test))):
-        if y_pred[i] and not y_test[i]:
-            wrong_preds.append(original_test_samples[i])
-            fp_index.append(i)
-        elif not y_pred[i] and y_test[i]:
-            wrong_preds.append(original_test_samples[i])
-            fn_index.append(i)
-        else:
-            right_preds.append(original_test_samples[i])
-
-    return wrong_preds, fp_index, fn_index, right_preds
 
 def reshape_1_sample(x_test_f1, x_test_f2, x_test_f3):
     if len(x_test_f1.shape) > 1:
@@ -314,51 +292,77 @@ def reshape_1_sample(x_test_f1, x_test_f2, x_test_f3):
 def get_wrong_predictions(model, x_test, y_test, original_test_samples):
     model.eval()
     
-    wrong_preds, fp_index, fn_index, right_preds = get_fp_fn_indexes(model, x_test, y_test, original_test_samples)
-        
-    wrong_pred_index = sorted(fp_index + fn_index)
+    fa = []
+    fd = []
+    fr = []
+    fv = []
     
-    x_test_FP = np.array([[x_test[0][i].cpu().numpy(), x_test[1][i].cpu().numpy(), x_test[2][i].cpu().numpy()] for i in fp_index])
-    x_test_FN = np.array([[x_test[0][i].cpu().numpy(), x_test[1][i].cpu().numpy(), x_test[2][i].cpu().numpy()] for i in fn_index])
-        
-    false_positives = []
-    for i in fp_index:
-        x_test_i = reshape_1_sample(x_test[0][i], x_test[1][i], x_test[2][i])
-        output = torch.sigmoid(model(x_test_i[0], x_test_i[1], x_test_i[2]).view(-1))
-        pred = [y.item() for y in output]
-        false_positives.append((wrong_preds[wrong_pred_index.index(i)], pred))
-            
-    false_negatives = []
-    for i in fn_index:
-        x_test_i = reshape_1_sample(x_test[0][i], x_test[1][i], x_test[2][i])
-        output = torch.sigmoid(model(x_test_i[0], x_test_i[1], x_test_i[2]).view(-1))
-        pred = [y.item() for y in output]
-        false_negatives.append((wrong_preds[wrong_pred_index.index(i)], pred))
+    output = model(x_test[0], x_test[1], x_test[2]) #Al parecer .view(-1) hace que la salida se aplane en una sola dimension o algo asi 
+    y_pred = torch.argmax(output, dim=1)  # Clasificacion Multiclase
+    
+    y_test = y_test.long()  #Nos aseguramos que y_test es del tipo correcto, ya que tiene que ser long para la funcion de perdida que tenemos creo
+     
+    for i in range(len(y_pred)):
+        if y_pred[i] == 0:
+            if y_test[i] != 0:fa.append((original_test_samples[i],decodificar(y_pred[i]))) #falsos atomicos      
+        elif y_pred[i] == 1:
+            if y_test[i] != 1:fd.append((original_test_samples[i],decodificar(y_pred[i]))) #falsos positivos
+        elif y_pred[i] == 2:
+            if y_test[i] != 2:fr.append((original_test_samples[i],decodificar(y_pred[i]))) #falsos positivos
+        elif y_pred[i] == 3:
+            if y_test[i] != 3:fv.append((original_test_samples[i],decodificar(y_pred[i]))) #falsos positivos
 
-    return false_positives, false_negatives
+    return fa, fd, fr, fv
+
+def get_wrong_predictions_bycases(model, x_test, y_test, original_test_samples):
+    model.eval()
+    
+    fa = []
+    fd = []
+    fr = []
+    fv = []
+    
+    output = model(x_test[0], x_test[1], x_test[2]) #Al parecer .view(-1) hace que la salida se aplane en una sola dimension o algo asi 
+    y_pred = torch.argmax(output, dim=1)  # Clasificacion Multiclase
+    
+    y_test = y_test.long()  #Nos aseguramos que y_test es del tipo correcto, ya que tiene que ser long para la funcion de perdida que tenemos creo
+     
+    for i in range(len(y_pred)):
+        if y_test[i] == 0:
+            if y_pred[i] != 0:fa.append((original_test_samples[i],decodificar(y_pred[i]))) #Fallos en casos de atomicidad      
+        elif y_test[i] == 1:
+            if y_pred[i] != 1:fd.append((original_test_samples[i],decodificar(y_pred[i]))) #Fallos en casos de condicion de carrera
+        elif y_test[i] == 2:
+            if y_pred[i] != 2:fr.append((original_test_samples[i],decodificar(y_pred[i]))) #Fallos en casos de DeadLock
+        elif y_test[i] == 3:
+            if y_pred[i] != 3:fv.append((original_test_samples[i],decodificar(y_pred[i]))) #Fallos en casos Validos
+
+    return fa, fd, fr, fv
 
 def filter_top_k_accuracies(accuracies, top_k):
     return heapq.nlargest(top_k, accuracies, key=lambda x: x['Overall'])
 
-def print_wrong_preds(wrong_preds_list, top_k=10):
+def print_wrong_preds(wrong_preds_list, k=10):
+        a=0
+        cases=["Atomicity violation", "DeadLock", "Data race ", "Valid"]
+        for i in wrong_preds_list:
+            
+            print(f'{min(k,len(i))} false {cases[a]}:')   
+            for j in range(min(k,len(i))):
+                print(f"Sample {i[j][0]} | Prediction {i[j][1]}")
+            a+=1
+            print("\n")
 
-    for i in range(len(wrong_preds_list)):
-        FPs, FNs = wrong_preds_list[i]
-        
-        top_k_FPs = heapq.nlargest(top_k, FPs, key=lambda x: x[1][0])
-        top_k_FNs = heapq.nlargest(top_k, FNs, key=lambda x: -x[1][0])
-        
-        def pretty_print(preds):
-            for pred in preds:
-                print(pred[0][1], pred[0][2], '| label:', pred[0][3], '| actual prediction:', pred[1][0])
-                
-        print(f'Top {top_k} false positives: \n')
-        pretty_print(top_k_FPs)
-
-        print(f'\nTop {top_k} false negatives: \n')
-        pretty_print(top_k_FNs)
-        
-        print("\n")
+def print_wrong_preds_bycases(wrong_preds_list, k=10):
+        a=0
+        cases=["Atomicity violation", "DeadLock", "Data race", "Valid"]
+        for i in wrong_preds_list:
+            
+            print(f'{min(k,len(i))} {cases[a]} cases wrong predicted:')   
+            for j in range(min(k,len(i))):
+                print(f"Sample {i[j][0]} | Prediction {i[j][1]}")
+            a+=1
+            print("\n")
         
 def get_stats_per_model(model_accuracies, model_names, original_test_samples, collapsed_ops=[]):
     
@@ -460,8 +464,9 @@ def display_epochs_stats(epoch_stats, num_experiments, display_train_loss=True,
         else:
             axes.xlabel("Number of epochs")
             axes.title("Epoch stats experiment #" + str(index))
-    
-    for i in range(int(num_experiments / ncols) + 1):
+        
+    aux = 1 if (num_experiments % ncols)!=0 else 0
+    for i in range(int(num_experiments / ncols) + aux):
         
         num_figs = ncols if i < int(num_experiments / ncols) else num_experiments % ncols
         fig, axes = plt.subplots(nrows=1, ncols=num_figs, figsize=(16,4))

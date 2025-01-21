@@ -38,7 +38,7 @@ class Data():
     
     def tipe_buggy(self, sample):
         if (('r' not in sample[2] and 'd' not in sample[2] and 'c' not in sample[2]) or 'c' in sample[2] and 'r' in sample[2]): return "V"
-        if ('d' not in sample[2] and'r' in sample[2]): return "C"
+        if ('d' not in sample[2] and'r' in sample[2]): return "R"
         if ('u' in sample[1]): #no hace falta comprobar que en sample2 hay dr
             if sample[1].index('w') >= sample[1].index('u') : return "A"
             else: return "V"
@@ -114,7 +114,7 @@ class Data():
        # unique_chars.remove(True)
        # unique_chars.remove(False)
         unique_chars.remove('A')
-        unique_chars.remove('C')
+        unique_chars.remove('R')
         unique_chars.remove('D')
         unique_chars.remove('V')
         unique_chars = sorted(list(unique_chars))
@@ -394,10 +394,4 @@ class Data():
         
         self.samples_char_sep = self.separate_string_chars(self.samples)
         
-        self.np_data = self.one_hot_encode(self.samples_char_sep)
-
-prueba=Data()
-#arr=prueba.one_hot_encode(prueba.separate_string_chars(prueba.generate_samples()))
-print(prueba.np_data)
-
-      
+        self.np_data = self.one_hot_encode(self.samples_char_sep)      
