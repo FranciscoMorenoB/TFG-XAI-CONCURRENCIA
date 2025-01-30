@@ -266,8 +266,8 @@ def imprimirMetricas(model_names, all_accuracies, all_precisions, all_recalls, a
 
     # Crear DataFrame
     df_metrics = pd.DataFrame(model_metrics)
-    #Esta linea deberia imprimir el df pero no lo hace, si se quiere imprimir desde aqui, aunq con peor formato, solo añadir print()
-    df_metrics
+    #Imprimimos el df
+    print(df_metrics)
     
 def decodificar(a):
     ret=["A", "D", "R", "V"]
