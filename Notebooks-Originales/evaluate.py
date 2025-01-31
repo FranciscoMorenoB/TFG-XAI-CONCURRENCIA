@@ -130,12 +130,14 @@ def get_precision_by_cases(model, X, Y, original_test_samples):  #Precisión = V
 
     if len(v_tp)+len(v_fp) > 0: precision = len(v_tp)/(len(v_tp)+len(v_fp))
     else: precision = 0.0
-    
+   
+    #Definimos el diccionario en el que se guardará la precision
+    precisions = {}
 
     # Calcular precisión general
-    precision['Overall'] = (precision)
+    precisions['Overall'] = (precision)
 
-    return precision
+    return precisions
 
 def get_recall_by_cases(model, X, Y, original_test_samples): #Recall = VP / VP + FN, mide la prop de positivos reales que el modelo identifica corrctamente
     model.eval()
@@ -158,11 +160,13 @@ def get_recall_by_cases(model, X, Y, original_test_samples): #Recall = VP / VP +
 
     if len(v_tp)+len(v_fn) > 0: recall = len(v_tp)/(len(v_tp)+len(v_fn))
     else: recall = 0.0
+   
+    #Definimos el diccionario en el que se guardará el recall
+    recalls = {}
     
-    
-    recall['Overall'] = (recall) 
+    recalls['Overall'] = (recall) 
 
-    return recall
+    return recalls
 
 def get_f1_by_cases(precision, recall): #F1 = 2*Precision*Recall / Precision+Recall, media armónica entre precisión y recall
 
@@ -174,6 +178,38 @@ def get_f1_by_cases(precision, recall): #F1 = 2*Precision*Recall / Precision+Rec
     )
     
     return f1_scores
+
+def imprimirMetricas(model_names, all_accuracies, all_precisions, all_recalls, all_f1_scores):
+    
+    # Lista para almacenar los datos
+    model_metrics = []
+
+    for i, model_name in enumerate(model_names):
+        # Esta linea sirve para encontrar el índice del episodio con el mejor accuracy
+        best_index = max(range(len(all_accuracies[i])), key=lambda idx: all_accuracies[i][idx]['Overall'])
+
+        # Obtenemos las métricas del mejor episodio 
+        best_accuracy = all_accuracies[i][best_index]['Overall']
+        best_precision = all_precisions[i][best_index]['Overall']
+        best_recall = all_recalls[i][best_index]['Overall']
+        best_f1_score = all_f1_scores[i][best_index]['Overall']
+
+        # Guardar en una lista para el DataFrame
+        row = {
+            'Modelo': model_name,
+            'Accuracy': best_accuracy,
+            'Precision': best_precision,
+            'Recall': best_recall,
+            'F1-score': best_f1_score
+        }
+
+      
+        model_metrics.append(row)
+
+    # Crear DataFrame
+    df_metrics = pd.DataFrame(model_metrics)
+    #Imprimimos el df
+    print(df_metrics)
 
 
 #-----------------------------------------------------------------------------------------------FIN NUEVO-----------------------------------------------------------------------------------------------------------------------------------------nuevo
