@@ -106,12 +106,11 @@ def get_accuracy_by_cases(model, X, Y, original_test_samples):
             
     return accuracies
 
-def get_precision_by_cases(model, X, Y, original_test_samples): #Precisión = VP / (VP + FP), la precisión mide cuántas de las predicciones positivas realmente lo son
+def get_precision(model, X, Y, original_test_samples): #Precisión = VP / (VP + FP), la precisión mide cuántas de las predicciones positivas realmente lo son
     model.eval()
 
     output = model(X[0], X[1], X[2])
     y_pred = torch.argmax(torch.softmax(output, dim=1), dim=1)
-    #Podrian ser contadores, pero se queda asi para poder debbugear
     v0=[]
     f0=[]
     v1=[]
@@ -124,16 +123,16 @@ def get_precision_by_cases(model, X, Y, original_test_samples): #Precisión = VP
     for i in range(len(y_pred)):
         if y_pred[i] == 0:
             if Y[i] == 0:v0.append(original_test_samples[i])
-            else:f0.append(original_test_samples[i]) #falsos positivos      
+            else:f0.append(original_test_samples[i]) #false atomicity     
         elif y_pred[i] == 1:
             if Y[i] == 1:v1.append(original_test_samples[i])
-            else:f1.append(original_test_samples[i]) #falsos positivos
+            else:f1.append(original_test_samples[i]) #false deadlocks
         elif y_pred[i] == 2:
             if Y[i] == 2:v2.append(original_test_samples[i])
-            else:f2.append(original_test_samples[i]) #falsos positivos
+            else:f2.append(original_test_samples[i]) #false dataraces
         elif y_pred[i] == 3:
             if Y[i] == 3:v3.append(original_test_samples[i])
-            else:f3.append(original_test_samples[i]) #falsos positivos
+            else:f3.append(original_test_samples[i]) #false valids
 
     if len(v0)+len(f0) > 0: precision0 = len(v0)/(len(v0)+len(f0))
     else: precision0 = 0.0
@@ -147,27 +146,23 @@ def get_precision_by_cases(model, X, Y, original_test_samples): #Precisión = VP
     if len(v3)+len(f3)>0: precision3 = len(v3)/(len(v3)+len(f3))
     else: precision3 = 0.0
 
-    # Calcular precisión por cada combinación f3_f2
     precision = {}
-    #Para calcular la precisión por cada clase
     precision['A'] = precision0
     precision['D'] = precision1
     precision['R'] = precision2
     precision['V'] = precision3
 
-    # Calcular precisión general
-    precision['Overall'] = (precision0+precision1+precision2+precision3) / 4 #media aritmetica o media ponderada?
+    precision['Overall'] = (precision0+precision1+precision2+precision3) / 4
 
     return precision
 
-def get_recall_by_cases(model, X, Y, original_test_samples): #VP/VP+FN
+def get_recall(model, X, Y, original_test_samples): #VP/VP+FN
     model.eval()
 
     # Obtener las predicciones del modelo
     output = model(X[0], X[1], X[2])
     y_pred = torch.argmax(torch.softmax(output, dim=1), dim=1)
 
-    #Podrian ser contadores, pero se queda asi para poder debbugear
     v0=[]
     f0=[]
     v1=[]
@@ -184,15 +179,14 @@ def get_recall_by_cases(model, X, Y, original_test_samples): #VP/VP+FN
             else:f0.append(original_test_samples[i])   
         elif y_pred[i] == 1:
             if Y[i] == 1:v1.append(original_test_samples[i])
-            else:f1.append(original_test_samples[i]) #falsos positivos
+            else:f1.append(original_test_samples[i]) 
         elif Y[i] == 2:
             if y_pred[i] == 2:v2.append(original_test_samples[i])
-            else:f2.append(original_test_samples[i]) #falsos positivos
+            else:f2.append(original_test_samples[i]) 
         elif Y[i] == 3:
             if y_pred[i] == 3:v3.append(original_test_samples[i])
-            else:f3.append(original_test_samples[i]) #falsos positivos
+            else:f3.append(original_test_samples[i]) 
         
-
     if len(v0)+len(f0) > 0: recall0 = len(v0)/(len(v0)+len(f0))
     else: recall0 = 0.0
     
@@ -205,24 +199,19 @@ def get_recall_by_cases(model, X, Y, original_test_samples): #VP/VP+FN
     if len(v3)+len(f3)>0: recall3 = len(v3)/(len(v3)+len(f3))
     else: recall3 = 0.0
 
-    recalls={}
-    
-    #Para calcular el recall por cada clase
+    recalls={} 
     recalls['A'] = recall0
     recalls['D'] = recall1
     recalls['R'] = recall2
     recalls['V'] = recall3
-
-    
-    recalls['Overall'] = (recall0+recall1+recall2+recall3) / 4 #media aritmetica o media ponderada?
+    recalls['Overall'] = (recall0+recall1+recall2+recall3) / 4
 
     return recalls
 
-def get_f1_by_cases(precision, recall):
+def get_f1(precision, recall):
 
     f1_scores={}
     
-    # Calcular el F1-score general (Overall)
     f1_scores['Overall'] = (
         2 * (precision['Overall'] * recall['Overall']) / (precision['Overall'] + recall['Overall'])
         if (precision['Overall'] + recall['Overall']) > 0 else 0.0
@@ -230,7 +219,7 @@ def get_f1_by_cases(precision, recall):
     
     return f1_scores
 
-def imprimirMetricas(model_names, all_accuracies, all_precisions, all_recalls, all_f1_scores):
+def get_summary_df(model_names, all_accuracies, all_precisions, all_recalls, all_f1_scores):
     
     # Lista para almacenar los datos
     model_metrics = []
@@ -269,7 +258,7 @@ def imprimirMetricas(model_names, all_accuracies, all_precisions, all_recalls, a
     #Imprimimos el df
     print(df_metrics)
     
-def decodificar(a):
+def decode(a):
     ret=["A", "D", "R", "V"]
     return ret[a]
 def convert_to_percentage(x):
@@ -350,61 +339,25 @@ def get_wrong_predictions(model, x_test, y_test, original_test_samples):
     fr = []
     fv = []
     
-    output = model(x_test[0], x_test[1], x_test[2]) #Al parecer .view(-1) hace que la salida se aplane en una sola dimension o algo asi 
+    output = model(x_test[0], x_test[1], x_test[2])
     y_pred = torch.argmax(output, dim=1)  # Clasificacion Multiclase
     
-    y_test = y_test.long()  #Nos aseguramos que y_test es del tipo correcto, ya que tiene que ser long para la funcion de perdida que tenemos creo
-     
-    for i in range(len(y_pred)):
-        if y_pred[i] == 0:
-            if y_test[i] != 0:fa.append((original_test_samples[i],decodificar(y_pred[i]))) #falsos atomicos      
-        elif y_pred[i] == 1:
-            if y_test[i] != 1:fd.append((original_test_samples[i],decodificar(y_pred[i]))) #falsos positivos
-        elif y_pred[i] == 2:
-            if y_test[i] != 2:fr.append((original_test_samples[i],decodificar(y_pred[i]))) #falsos positivos
-        elif y_pred[i] == 3:
-            if y_test[i] != 3:fv.append((original_test_samples[i],decodificar(y_pred[i]))) #falsos positivos
-
-    return fa, fd, fr, fv
-
-def get_wrong_predictions_bycases(model, x_test, y_test, original_test_samples):
-    model.eval()
-    
-    fa = []
-    fd = []
-    fr = []
-    fv = []
-    
-    output = model(x_test[0], x_test[1], x_test[2]) #Al parecer .view(-1) hace que la salida se aplane en una sola dimension o algo asi 
-    y_pred = torch.argmax(output, dim=1)  # Clasificacion Multiclase
-    
-    y_test = y_test.long()  #Nos aseguramos que y_test es del tipo correcto, ya que tiene que ser long para la funcion de perdida que tenemos creo
+    y_test = y_test.long() 
      
     for i in range(len(y_pred)):
         if y_test[i] == 0:
-            if y_pred[i] != 0:fa.append((original_test_samples[i],decodificar(y_pred[i]))) #Fallos en casos de atomicidad      
+            if y_pred[i] != 0:fa.append((original_test_samples[i],decode(y_pred[i]))) #Wrong atomicity cases     
         elif y_test[i] == 1:
-            if y_pred[i] != 1:fd.append((original_test_samples[i],decodificar(y_pred[i]))) #Fallos en casos de condicion de carrera
+            if y_pred[i] != 1:fd.append((original_test_samples[i],decode(y_pred[i]))) #Wrong deadlock cases
         elif y_test[i] == 2:
-            if y_pred[i] != 2:fr.append((original_test_samples[i],decodificar(y_pred[i]))) #Fallos en casos de DeadLock
+            if y_pred[i] != 2:fr.append((original_test_samples[i],decode(y_pred[i]))) #Wrong datarace cases
         elif y_test[i] == 3:
-            if y_pred[i] != 3:fv.append((original_test_samples[i],decodificar(y_pred[i]))) #Fallos en casos Validos
+            if y_pred[i] != 3:fv.append((original_test_samples[i],decode(y_pred[i]))) #Wrong valid cases
 
     return fa, fd, fr, fv
 
 def filter_top_k_accuracies(accuracies, top_k):
     return heapq.nlargest(top_k, accuracies, key=lambda x: x['Overall'])
-
-def print_wrong_preds(wrong_preds_list, k=10):
-        a=0
-        cases=["Atomicity violation", "DeadLock", "Data race ", "Valid"]
-        for i in wrong_preds_list:
-            
-            print(f'{min(k,len(i))} false {cases[a]}:')   
-            for j in range(min(k,len(i))):
-                print(f"Sample {i[j][0]} | Prediction {i[j][1]}")
-            a+=1
-            print("\n")
 
 def print_wrong_preds_bycases(wrong_preds_list, k=10):
         a=0
