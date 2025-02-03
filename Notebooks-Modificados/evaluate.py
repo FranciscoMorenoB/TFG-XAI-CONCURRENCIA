@@ -22,6 +22,9 @@ def get_count_cases(samples_list):
         elif sample[1].find('w') != -1:
             cases_dict[f3 + 'w'] += 1
         else:
+        
+        
+        
             cases_dict[f3 + 'noop'] += 1
 
     for i in range(len(samples_list)):
@@ -257,6 +260,37 @@ def get_summary_df(model_names, all_accuracies, all_precisions, all_recalls, all
     df_metrics = pd.DataFrame(model_metrics)
     #Imprimimos el df
     print(df_metrics)
+
+def get_stats_per_model_multiclass(model_accuracies, model_precisions, model_recalls, model_f1, model_names):
+     # Extraer Accuracy y F1-score por modelo
+    accuracy_values = [model['Overall'] for model in model_accuracies]
+    f1_values = [model['Overall'] for model in model_f1]
+    
+    # Extraer Precision y Recall por clase, incluyendo el 'Overall'
+    classes = list(model_precisions[0].keys())  # Obtener nombres de clases
+    precision_per_class = {f"Precision_{cls}": [model[cls] for model in model_precisions] for cls in classes}
+    recall_per_class = {f"Recall_{cls}": [model[cls] for model in model_recalls] for cls in classes}
+    
+    # Obtener los valores 'Overall' para Precision y Recall
+    precision_overall = [model['Overall'] for model in model_precisions]
+    recall_overall = [model['Overall'] for model in model_recalls]
+
+    # Crear DataFrame
+    data = {
+        "Modelo": model_names,
+        "Accuracy": accuracy_values,
+        "F1-score": f1_values,
+        "Precision_Overall": precision_overall,
+        "Recall_Overall": recall_overall,
+    }
+
+    # Agregar Precision y Recall por clase
+    data.update(precision_per_class)
+    data.update(recall_per_class)
+
+    results_df = pd.DataFrame(data)
+    
+    return results_df
     
 def decode(a):
     ret=["A", "D", "R", "V"]
@@ -333,6 +367,30 @@ def reshape_1_sample(x_test_f1, x_test_f2, x_test_f3):
 
 def get_wrong_predictions(model, x_test, y_test, original_test_samples):
     model.eval()
+
+    fa = []
+    fd = []
+    fr = []
+    fv = []
+
+    output = model(x_test[0], x_test[1], x_test[2]) #Al parecer .view(-1) hace que la salida se aplane en una sola dimension o algo asi 
+    y_pred = torch.argmax(output, dim=1)  # Clasificacion Multiclase
+    
+    y_test = y_test.long()  #Nos aseguramos que y_test es del tipo correcto, ya que tiene que ser long para la funcion de perdida que tenemos creo
+     
+    for i in range(len(y_pred)):
+        if y_pred[i] == 0:
+            if y_test[i] != 0:fa.append((original_test_samples[i],decode(y_pred[i]))) #false atomicity    
+        elif y_pred[i] == 1:
+            if y_test[i] != 1:fd.append((original_test_samples[i],decode(y_pred[i]))) #false deadlocks
+        elif y_pred[i] == 2:
+            if y_test[i] != 2:fr.append((original_test_samples[i],decode(y_pred[i]))) #false dataraces
+        elif y_pred[i] == 3:
+            if y_test[i] != 3:fv.append((original_test_samples[i],decode(y_pred[i]))) #false valids
+    return fa, fd, fr, fv
+
+def get_wrong_predictions_bycases(model, x_test, y_test, original_test_samples):
+    model.eval()
     
     fa = []
     fd = []
@@ -365,6 +423,17 @@ def print_wrong_preds_bycases(wrong_preds_list, k=10):
         for i in wrong_preds_list:
             
             print(f'{min(k,len(i))} {cases[a]} cases wrong predicted:')   
+            for j in range(min(k,len(i))):
+                print(f"Sample {i[j][0]} | Prediction {i[j][1]}")
+            a+=1
+            print("\n")
+
+def print_wrong_preds(wrong_preds_list, k=10):
+        a=0
+        cases=["Atomicity violation", "DeadLock", "Data race ", "Valid"]
+        for i in wrong_preds_list:
+            
+            print(f'{min(k,len(i))} false {cases[a]}:')   
             for j in range(min(k,len(i))):
                 print(f"Sample {i[j][0]} | Prediction {i[j][1]}")
             a+=1
