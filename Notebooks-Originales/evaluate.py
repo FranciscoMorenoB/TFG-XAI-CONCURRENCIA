@@ -109,7 +109,7 @@ def get_accuracy_by_cases(model, X, Y, original_test_samples):
 #----------------------------------------------------------------------------------------------NUEVO----cambiar modelo--------------------------------------------------------------------------------------------------------------------------------------nuevo
 
 
-def get_precision_by_cases(model, X, Y, original_test_samples):  #Precisión = VP / (VP + FP),  la precisión mide cuántas de las predicciones positivas realmente lo son; son correctas
+def get_precision(model, X, Y, original_test_samples):  #Precisión = VP / (VP + FP),  la precisión mide cuántas de las predicciones positivas realmente lo son; son correctas
     model.eval()
 
      # Obtener las predicciones del modelo
@@ -139,7 +139,7 @@ def get_precision_by_cases(model, X, Y, original_test_samples):  #Precisión = V
 
     return precisions
 
-def get_recall_by_cases(model, X, Y, original_test_samples): #Recall = VP / VP + FN, mide la prop de positivos reales que el modelo identifica corrctamente
+def get_recall(model, X, Y, original_test_samples): #Recall = VP / VP + FN, mide la prop de positivos reales que el modelo identifica corrctamente
     model.eval()
 
     # Obtener las predicciones del modelo
@@ -168,7 +168,7 @@ def get_recall_by_cases(model, X, Y, original_test_samples): #Recall = VP / VP +
 
     return recalls
 
-def get_f1_by_cases(precision, recall): #F1 = 2*Precision*Recall / Precision+Recall, media armónica entre precisión y recall
+def get_f1(precision, recall): #F1 = 2*Precision*Recall / Precision+Recall, media armónica entre precisión y recall
 
     f1_scores={}
     # Calcular el F1-score general (Overall)
@@ -179,7 +179,7 @@ def get_f1_by_cases(precision, recall): #F1 = 2*Precision*Recall / Precision+Rec
     
     return f1_scores
 
-def imprimirMetricas(model_names, all_accuracies, all_precisions, all_recalls, all_f1_scores):
+def get_summary_df(model_names, all_accuracies, all_precisions, all_recalls, all_f1_scores):
     
     # Lista para almacenar los datos
     model_metrics = []
