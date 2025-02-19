@@ -122,12 +122,12 @@ class Data():
         self.le = LabelEncoder()
         self.le.fit(unique_chars)
 
-        feature_names_one_hotted = []
+        self.feature_names_one_hotted  = []
 
         for i in range(3):
             for j in range(self.layer_size):
                 for c in self.le.classes_:
-                    feature_names_one_hotted.append(f'f{i + 1}-{j}-{c}')
+                    self.feature_names_one_hotted .append(f'f{i + 1}-{j}-{c}') #f{número de función}-{posición}-{carácter}.
 
         df_no_label = df.drop(['Correct'], axis=1)
         df_encoded = df_no_label.apply(self.le.transform)
@@ -146,7 +146,7 @@ class Data():
         self.ohe = OneHotEncoder(categories='auto')
         self.ohe.fit(df_unique_labels)
 
-        one_hotted_df = pd.DataFrame(self.ohe.transform(df_encoded).toarray(), columns=feature_names_one_hotted)
+        one_hotted_df = pd.DataFrame(self.ohe.transform(df_encoded).toarray(), columns=self.feature_names_one_hotted )
         self.num_one_hot_encodings = int(one_hotted_df.shape[1] / self.layer_size / 3)
         one_hotted_df['label'] = df['Correct']
 
