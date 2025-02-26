@@ -5,6 +5,8 @@ import heapq
 import torch
 import copy 
 import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+
 
 f2_cases = ['wu', 'uw', 'w', 'noop']
 f3_cases = ['dr', 'cr', 'r', 'noop']
@@ -295,6 +297,22 @@ def get_stats_per_model_multiclass(model_accuracies, model_precisions, model_rec
 def decode(a):
     ret=["A", "D", "R", "V"]
     return ret[a]
+
+def confusionMatrix(model, X, Y, ):
+    model.eval()
+
+    # Obtener las predicciones del modelo
+    output = model(X[0], X[1], X[2])
+    y_pred = torch.argmax(torch.softmax(output, dim=1), dim=1)
+
+    df_true = pd.DataFrame({"y_true": Y})
+
+    df_pred = pd.DataFrame({"y_pred": y_pred})
+    cm = confusion_matrix(df_true.y_true, df_pred.y_pred)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["A","D","R", "V"])
+    disp.plot(cmap="Blues")
+
+
 def convert_to_percentage(x):
     return str(round(x * 100, 1)) + '%'
 
