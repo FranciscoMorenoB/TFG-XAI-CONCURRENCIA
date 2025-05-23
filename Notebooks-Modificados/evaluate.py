@@ -298,20 +298,52 @@ def decode(a):
     ret=["A", "D", "R", "V"]
     return ret[a]
 
-def confusionMatrix(model, X, Y, ):
+def confusionMatrix(model, X, Y):
     model.eval()
-
+    label_map = ["A", "D", "R", "V"]
     # Obtener las predicciones del modelo
     output = model(X[0], X[1], X[2])
     y_pred = torch.argmax(torch.softmax(output, dim=1), dim=1)
 
     df_true = pd.DataFrame({"y_true": Y})
+    y_pred_labels = [label_map[i] for i in y_pred]
+    df_pred = pd.DataFrame({"y_pred": y_pred_labels})
 
-    df_pred = pd.DataFrame({"y_pred": y_pred})
     cm = confusion_matrix(df_true.y_true, df_pred.y_pred)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["A","D","R", "V"])
-    disp.plot(cmap="Blues")
+    fig, ax = plt.subplots(figsize=(4, 4)) 
+    disp.plot(cmap="Blues", ax=ax)
+    
 
+def confusionMatrixs(models, Xs, Y, experiment_name):
+    label_map = ["A", "D", "R", "V"]
+    
+    experiment_names=["CNN", "LSTM", "DEEPSET", "DEEPSETV2", "FEEDFORWARD"]
+
+    fig, axes = plt.subplots(2, 3, figsize=(20, 10)) 
+    axes = axes.flatten()
+
+    for i, (model, X) in enumerate(zip(models, Xs)):
+        model.eval()
+        with torch.no_grad():
+            output = model(X[0], X[1], X[2])
+            y_pred = torch.argmax(torch.softmax(output, dim=1), dim=1).cpu().numpy()
+            y_pred_labels = [label_map[i] for i in y_pred]
+
+        df_true = pd.DataFrame({"y_true": Y})
+        df_pred = pd.DataFrame({"y_pred": y_pred_labels})
+
+        cm = confusion_matrix(df_true.y_true, df_pred.y_pred, labels=label_map)
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=label_map)
+        disp.plot(cmap="Blues", ax=axes[i])
+        axes[i].set_title(experiment_names[i]+" "+experiment_name)
+
+    # Sino queda un hueco ahi
+    for j in range(len(models), len(axes)):
+        fig.delaxes(axes[j])
+
+    plt.tight_layout()
+    plt.show()
 
 def convert_to_percentage(x):
     return str(round(x * 100, 1)) + '%'
